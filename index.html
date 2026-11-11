@@ -1,0 +1,1562 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>地城行者 · 簡易版</title>
+
+<!-- =====================================================
+     【第 1 部分】CSS 樣式：手機直式版面
+     上半：地城戰鬥畫面（只看）　下半：整備面板（做決定）
+     ===================================================== -->
+<style>
+  :root {
+    --bg: #14101f; --panel: #1f1830; --card: #2a2142; --line: #3b2f5c;
+    --text: #f2eefc; --muted: #9d93bf; --gold: #ffd84d;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font-family: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    overflow: hidden; touch-action: manipulation; user-select: none; -webkit-user-select: none;
+  }
+  #app {
+    max-width: 480px; margin: 0 auto;
+    height: 100vh; height: 100dvh;
+    display: flex; flex-direction: column;
+  }
+
+  /* ---------- 上半：地城畫面 ---------- */
+  #stage { position: relative; flex: 0 0 auto; }
+  #game { display: block; width: 100%; height: auto; aspect-ratio: 360 / 400; image-rendering: pixelated; background: #000; }
+  #ctrl { position: absolute; right: 6px; top: 50px; display: flex; flex-direction: column; gap: 6px; }
+  #ctrl button {
+    width: 38px; height: 38px; font-size: 16px; font-weight: bold; font-family: inherit;
+    background: rgba(20,14,36,0.85); color: #fff; border: 2px solid #5a4a8a; padding: 0;
+  }
+  #ctrl button:active { background: #5a4a8a; }
+  #toast {
+    position: absolute; left: 50%; bottom: 66px; transform: translateX(-50%);
+    max-width: 92%; padding: 8px 14px; background: rgba(0,0,0,0.82); border: 2px solid #fff;
+    font-size: 14px; font-weight: bold; text-align: center; opacity: 0; pointer-events: none; transition: opacity 0.25s;
+  }
+  #toast.show { opacity: 1; }
+  .overlay {
+    position: absolute; inset: 0; display: none;
+    flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    background: rgba(10,6,20,0.82); text-align: center;
+  }
+  .overlay.show { display: flex; }
+  .overlay .big { font-size: 32px; font-weight: bold; text-shadow: 3px 3px 0 #000; }
+  .overlay p { margin: 2px; line-height: 1.7; font-size: 15px; }
+  .overlay .row { display: flex; gap: 10px; margin-top: 6px; }
+
+  /* ---------- 下半：整備面板 ---------- */
+  #panel { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--panel); border-top: 3px solid var(--line); }
+  #summary { padding: 6px 12px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); line-height: 1.5; }
+  #tip { display: none; padding: 8px 12px; font-size: 13px; font-weight: bold; background: #3a2d12; color: var(--gold); border-bottom: 1px solid var(--line); }
+  #tip.show { display: block; }
+  #tabs { display: flex; }
+  #tabs button {
+    flex: 1; padding: 11px 0; font-size: 15px; font-weight: bold; background: var(--panel); color: var(--muted);
+    border: 0; border-bottom: 3px solid transparent; font-family: inherit;
+  }
+  #tabs button.on { color: var(--text); border-bottom-color: var(--gold); background: var(--card); }
+  #badge { color: #ff5470; }
+  #list { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 8px 10px; }
+
+  .card { background: var(--card); border: 2px solid var(--line); padding: 8px 10px; margin-bottom: 8px; }
+  .card .head { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+  .card .chip { width: 12px; height: 12px; flex: none; }
+  .card .slot { margin-left: auto; font-size: 12px; color: var(--muted); }
+  .aff { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-top: 5px; min-height: 28px; }
+  .aff .t { flex: 1; }
+  .star { color: var(--gold); }
+  .leg { font-size: 13px; margin-top: 5px; color: #ff9a4d; font-weight: bold; }
+  .empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
+  .btns { display: flex; gap: 8px; margin-top: 8px; }
+
+  button.px {
+    font-family: inherit; font-size: 13px; font-weight: bold; padding: 7px 12px; min-height: 36px;
+    background: var(--gold); color: #1a1626; border: 3px solid #000; box-shadow: 3px 3px 0 #000; cursor: pointer;
+  }
+  button.px:active { transform: translate(3px,3px); box-shadow: none; }
+  button.px.sub { background: #5a4a8a; color: #fff; }
+  button.px.small { padding: 3px 8px; min-height: 30px; font-size: 12px; }
+  button.px[disabled] { opacity: 0.45; }
+  .btns button { flex: 1; }
+  #foot { padding: 4px 10px 8px; display: flex; justify-content: flex-end; }
+  #foot button { background: none; border: 0; color: var(--muted); font-size: 12px; font-family: inherit; text-decoration: underline; }
+</style>
+</head>
+
+<!-- =====================================================
+     【第 2 部分】HTML 結構
+     ===================================================== -->
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="game"></canvas>
+    <div id="ctrl">
+      <button id="pauseBtn" title="暫停">⏸</button>
+      <button id="speedBtn" title="加速">x1</button>
+    </div>
+    <div id="toast"></div>
+    <div id="end" class="overlay">
+      <div class="big" id="endTitle"></div>
+      <p id="endStats"></p>
+      <div class="row" id="endBtns"></div>
+    </div>
+  </div>
+
+  <div id="panel">
+    <div id="summary"></div>
+    <div id="tip"></div>
+    <div id="tabs">
+      <button data-act="tab" data-tab="equip" class="on">裝備</button>
+      <button data-act="tab" data-tab="bag">背包 <span id="badge"></span></button>
+    </div>
+    <div id="list"></div>
+    <div id="foot"><button id="resetBtn">清除存檔</button></div>
+  </div>
+</div>
+
+<!-- =====================================================
+     【第 3 部分】JavaScript：遊戲的大腦
+     ===================================================== -->
+<script>
+// =====================================================
+// 3-1. 遊戲設定：想調整難度或手感，改這裡的數字就好！
+// =====================================================
+const CONFIG = {
+  // --- 主角 ---
+  heroHp: 120,            // 基本血量
+  heroSpeed: 70,          // 走路速度（每秒幾個像素）
+  heroRegenWalk: 4,       // 走路時每秒回血
+  heroRegenFight: 0.5,    // 戰鬥時每秒回血
+  fightRange: 120,        // 距離怪物多近就停下來戰鬥
+  // --- 技能一：火球（自動打最近的怪）---
+  fireDmg: 10,            // 火球基本傷害
+  fireInterval: 0.7,      // 火球發射間隔（秒）
+  fireSpeed: 280,         // 火球飛行速度
+  fireRange: 200,         // 怪物進到這個距離，就開始發射火球
+  // --- 技能二：震擊（以主角為中心的衝擊波）---
+  novaDmg: 14,            // 震擊傷害
+  novaInterval: 3,        // 震擊間隔（秒）
+  novaRadius: 70,         // 震擊基本範圍
+  // --- 詞綴效果 ---
+  critChance: 0.05,       // 基本暴擊機率
+  critMult: 2,            // 暴擊倍率
+  explodeRadius: 42,      // 火球爆炸範圍
+  explodeRate: 0.6,       // 爆炸傷害 = 火球傷害 × 這個數字
+  chainJumps: 2,          // 閃電連鎖跳幾隻
+  chainRange: 90,         // 閃電一次最遠跳多遠
+  chainRate: 0.6,         // 閃電傷害 = 震擊傷害 × 這個數字
+  burnDuration: 2.5,      // 傳奇「焚地」火焰持續秒數
+  burnRate: 0.5,          // 火焰每 0.4 秒傷害 = 火球傷害 × 這個數字
+  // --- 怪物（第 1 關的數值；之後每關會變強）---
+  slimeHp: 14,   slimeDmg: 5,   slimeSpeed: 40,  slimeAtkInterval: 1.0,
+  skelHp: 28,    skelDmg: 9,    skelSpeed: 34,   skelAtkInterval: 1.2,
+  ghostHp: 20,   ghostDmg: 7,   ghostSpeed: 50,  ghostAtkInterval: 0.9,
+  mimicHp: 45,   mimicDmg: 11,  mimicSpeed: 46,  mimicAtkInterval: 1.0,
+  bossHp: 130,   bossDmg: 9,    bossSpeed: 30,   bossAtkInterval: 1.1,
+  stageHpGrow: 0.3,       // 每過一關，怪物血量多 30%
+  stageDmgGrow: 0.15,     // 每過一關，怪物傷害多 15%
+  aggroRange: 150,        // 怪物發現主角的距離
+  // --- 地圖與事件 ---
+  trapDmg: 6,             // 尖刺陷阱的傷害（之後每關會增加）
+  mimicChance: 0.3,       // 寶箱其實是寶箱怪的機率
+  altarCost: 0.15,        // 祭壇要獻祭多少比例的血量
+  altarWinChance: 0.55,   // 祭壇賭贏的機率（贏了得到好裝備）
+  fountainHeal: 0.5,      // 治療泉回復多少比例的血量
+  // --- 掉寶與金幣 ---
+  dropChance: 0.2,        // 每隻怪掉裝備的機率
+  chestGold: 25,          // 寶箱給的金幣
+  bossGold: 80,           // Boss 給的金幣
+  rerollBaseCost: 15,     // 重鑄詞綴費用 =（該裝備已重鑄次數 + 1）× 這個數字
+  bagMax: 40,             // 背包最多放幾件
+};
+
+// =====================================================
+// 3-2. 裝備資料：稀有度、詞綴、傳奇特效
+// =====================================================
+const SLOTS = ['weapon', 'armor', 'trinket'];
+const SLOT_NAME = { weapon: '法杖', armor: '長袍', trinket: '護符' };
+const RARITY_NAME = ['普通', '魔法', '稀有', '傳奇'];
+const RCOL = ['#d0d0d8', '#5aa2ff', '#ffd84d', '#ff8c2e'];   // 白、藍、黃、橘
+const SELL_PRICE = [3, 8, 20, 60];
+
+// 詞綴種類：text 是顯示的文字，min~max 是數值範圍，w 是被抽中的權重
+const AFFIXES = {
+  fireDmg:     { text: (v) => `火球傷害 +${v}%`,             min: 8,  max: 20, w: 10 },
+  fireSpeed:   { text: (v) => `火球攻速 +${v}%`,             min: 8,  max: 18, w: 10 },
+  fireSplit:   { text: (v) => `火球多射 +${v} 顆`,           min: 1,  max: 2,  w: 4 },
+  fireExplode: { text: (v) => `火球命中時 ${v}% 機率爆炸`,    min: 15, max: 35, w: 8 },
+  novaRadius:  { text: (v) => `震擊範圍 +${v}%`,             min: 10, max: 30, w: 8 },
+  novaChain:   { text: (v) => `震擊命中時 ${v}% 機率連鎖閃電`, min: 15, max: 35, w: 8 },
+  crit:        { text: (v) => `暴擊機率 +${v}%`,             min: 4,  max: 10, w: 8 },
+  hp:          { text: (v) => `生命 +${v}`,                  min: 15, max: 40, w: 8 },
+};
+const LEGENDS = {
+  burn: { name: '焚地者', text: '火球命中後，在地面留下燃燒的火焰' },
+  twin: { name: '雙響者', text: '震擊會在 0.4 秒後再震一次' },
+};
+let uid = 1;
+
+function pickAffixKeys(n, exclude = []) {
+  const pool = Object.keys(AFFIXES).filter((k) => !exclude.includes(k));
+  const out = [];
+  for (let i = 0; i < n && pool.length; i++) out.push(pool.splice(pickWeighted(pool.map((k) => AFFIXES[k].w)), 1)[0]);
+  return out;
+}
+function rollAffix(key) {
+  const d = AFFIXES[key];
+  const v = randInt(d.min, d.max);
+  return { key, v, perfect: d.max > d.min && v >= d.min + 0.9 * (d.max - d.min) };
+}
+// 產生一件裝備。luck（0~1）越高越容易出好稀有度；minRarity 是最低稀有度（寶箱、Boss 用）
+function makeItem(luck, minRarity = 0) {
+  const w = [55 * (1 - 0.5 * luck), 28, 13 * (1 + luck), 4 * (1 + 2 * luck)];
+  for (let i = 0; i < minRarity; i++) w[i] = 0;
+  const rarity = pickWeighted(w);
+  const slot = SLOTS[randInt(0, 2)];
+  const affixes = pickAffixKeys([1, 2, 3, 3][rarity]).map(rollAffix);
+  const legend = rarity === 3 ? (Math.random() < 0.5 ? 'burn' : 'twin') : null;
+  const name = (legend ? LEGENDS[legend].name : RARITY_NAME[rarity]) + SLOT_NAME[slot];
+  return { id: uid++, slot, rarity, name, affixes, legend, rerolls: 0 };
+}
+
+// =====================================================
+// 3-3. 小工具
+// =====================================================
+const $ = (id) => document.getElementById(id);
+const rand = (a, b) => a + Math.random() * (b - a);
+const randInt = (a, b) => Math.floor(rand(a, b + 1));
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const TAU = Math.PI * 2;
+function pickWeighted(weights) {
+  let t = weights.reduce((a, b) => a + b, 0) * Math.random();
+  for (let i = 0; i < weights.length; i++) { t -= weights[i]; if (t <= 0) return i; }
+  return weights.length - 1;
+}
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+  return arr;
+}
+
+// =====================================================
+// 3-4. 像素圖：用文字畫圖，每個字母代表一種顏色
+// =====================================================
+const HERO_ROWS = ["..KKKK..", ".KYYYYK.", ".KYWYWK.", ".KYYYYK.", "..KBBK..", ".KBBBBK.", "..KBBK..", "..K..K.."];
+const SLIME_FRAMES = [
+  ["........", "..GGGG..", ".GGGGGG.", "GGWGGWGG", "GGKGGKGG", "GGGGGGGG", "GGGGGGGG", ".G.GG.G."],
+  ["........", "........", "..GGGG..", ".GWGGWG.", "GGKGGKGG", "GGGGGGGG", "GGGGGGGG", "GGGGGGGG"],
+];
+const SKEL_ROWS = ["..WWWW..", ".WWWWWW.", ".WKWWKW.", "..WWWW..", "..WKKW..", ".WWWWWW.", "..W..W..", ".WW..WW."];
+const GHOST_ROWS = ["..GGGG..", ".GGGGGG.", "GGKGGKGG", "GGKGGKGG", "GGGKKGGG", "GGGGGGGG", "GGGGGGGG", "G.GG.GG."];
+const MIMIC_ROWS = ["........", ".KKKKKK.", "KOOOOOOK", "KOWOOWOK", "KKKKKKKK", "KWKWKWKK", "KOOOOOOK", "KKKKKKKK"];
+const ARMOR_COL = ['#d0d0d8', '#4f8cff', '#f2c94c', '#ff7a2e'];
+
+function drawSprite(c, rows, cx, cy, size, colors, flash) {
+  const h = rows.length, w = rows[0].length;
+  const ox = Math.round(cx - (w * size) / 2), oy = Math.round(cy - (h * size) / 2);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const ch = rows[y][x];
+    if (ch === '.') continue;
+    c.fillStyle = flash ? '#fff' : colors[ch];
+    c.fillRect(ox + x * size, oy + y * size, size, size);
+  }
+}
+
+// =====================================================
+// 3-5. 畫布與音效
+// =====================================================
+const cv = $('game');
+const ctx = cv.getContext('2d');
+const W = 360, H = 400;                       // 畫面的「邏輯大小」
+cv.width = W * 2; cv.height = H * 2;          // 實際畫素放大 2 倍，文字才會清楚
+ctx.setTransform(2, 0, 0, 2, 0, 0);
+
+let audioCtx = null;
+function initAudio() {
+  if (audioCtx) return;
+  try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+}
+function playTone(freq, dur, type = 'square', vol = 0.04, delay = 0) {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime + delay;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(audioCtx.destination); o.start(t); o.stop(t + dur);
+}
+window.addEventListener('pointerdown', initAudio);
+
+// =====================================================
+// 3-6. 主題：每 2 關換一個場景（地板、牆壁、怪物、Boss 都不同）
+// =====================================================
+const THEMES = [
+  { id: 'dungeon', name: '石牢',
+    floorA: '#52463f', floorB: '#4a3f3a', crack: '#3a312d', wall: '#6b3f2a', wallLine: '#3a2015', wallHi: '#85513a', void: '#0d0a18',
+    torch: '#ff7a2e', ambient: '#ffb040', slime: ['#4fd65a', '#4db8ff'],
+    kinds: [['slime', 75], ['skel', 25]], boss: { name: '史萊姆王', sprite: 'slime', color: '#b03a8a' } },
+  { id: 'graveyard', name: '幽暗墓地',
+    floorA: '#3c4a3c', floorB: '#364336', crack: '#26302a', wall: '#4a4a5e', wallLine: '#22223a', wallHi: '#64647e', void: '#07090f',
+    torch: '#9be8ff', ambient: '#7fd0ff', slime: ['#b26bff'],
+    kinds: [['skel', 45], ['ghost', 40], ['slime', 15]], boss: { name: '骷髏領主', sprite: 'skel', color: '#d8d0f0' } },
+  { id: 'lava', name: '熔岩洞',
+    floorA: '#4a3030', floorB: '#432a2a', crack: '#2f1c1c', wall: '#5a2a1a', wallLine: '#2a0f08', wallHi: '#7a3a22', void: '#120606',
+    torch: '#ff4d2e', ambient: '#ff6a30', slime: ['#ff6a2e', '#ff4d4d'],
+    kinds: [['slime', 55], ['skel', 25], ['ghost', 20]], boss: { name: '熔岩史萊姆王', sprite: 'slime', color: '#ff7a1a' } },
+];
+let theme = THEMES[0];
+
+// =====================================================
+// 3-7. 地城：用「房間 + 走廊」隨機拼出地圖
+//      主路通往 Boss，另外有幾條分岔通往死路房，角色會自動走進去探索再回頭
+// =====================================================
+const TILE = 24;                 // 每格 24 像素
+const COLS = 3, ROWS = 5, CELL_W = 14, CELL_H = 12;    // 地圖分成 3×5 個大格，每個大格放一個房間
+let dun;                         // 目前這一關的地城資料
+
+// 隨機走出一條從最下排往最上排的主路（可以左右拐彎）
+function makeRoute() {
+  for (;;) {
+    let cx = randInt(0, COLS - 1), cy = ROWS - 1;
+    const route = [{ cx, cy }];
+    const seen = new Set([cx + ',' + cy]);
+    while (cy > 0) {
+      const sides = [-1, 1].filter((d) => cx + d >= 0 && cx + d < COLS && !seen.has((cx + d) + ',' + cy));
+      if (sides.length && Math.random() < 0.55) cx += sides[randInt(0, sides.length - 1)];
+      else cy -= 1;
+      seen.add(cx + ',' + cy);
+      route.push({ cx, cy });
+    }
+    if (route.length >= 6) return route;                    // 太短的路線重抽
+  }
+}
+
+function buildDungeon() {
+  theme = THEMES[Math.floor((stageNo - 1) / 2) % THEMES.length];
+  const WT = COLS * CELL_W, HT = ROWS * CELL_H;
+  const grid = Array.from({ length: HT }, () => new Array(WT).fill(false));    // 能不能走
+  const obst = Array.from({ length: HT }, () => new Array(WT).fill(0));        // 障礙物：1 = 柱子、2 = 水池／岩漿
+  const trapGrid = Array.from({ length: HT }, () => new Array(WT).fill(false)); // 尖刺陷阱
+  const seen = Array.from({ length: HT }, () => new Array(WT).fill(false));    // 小地圖：走過的地方
+  const carve = (x0, y0, x1, y1) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) grid[y][x] = true; };
+  const cc = (c) => ({ x: c.cx * CELL_W + CELL_W / 2, y: c.cy * CELL_H + CELL_H / 2 });   // 大格的中心（格子座標）
+
+  const route = makeRoute();
+  const onRoute = new Set(route.map((c) => c.cx + ',' + c.cy));
+
+  // ---------- 挑出幾個「死路房」，接在主路旁邊 ----------
+  const cand = [];
+  route.forEach((c, i) => {
+    if (i === 0 || i === route.length - 1) return;           // 起點和 Boss 房旁邊不接
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, -1], [0, 1]]) {
+      const nx = c.cx + dx, ny = c.cy + dy;
+      if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && !onRoute.has(nx + ',' + ny)) cand.push({ from: i, cx: nx, cy: ny });
+    }
+  });
+  shuffle(cand);
+  const branches = [], usedCells = new Set();
+  const want = randInt(2, 3);
+  for (const b of cand) {
+    if (usedCells.has(b.cx + ',' + b.cy)) continue;
+    usedCells.add(b.cx + ',' + b.cy);
+    branches.push(b);
+    if (branches.length >= want) break;
+  }
+  const propTypes = shuffle(['chest', 'altar', 'fountain']);
+  branches.forEach((b, i) => { b.prop = propTypes[i % 3]; b.guard = Math.random() < 0.6; });
+
+  // ---------- 挖房間和走廊 ----------
+  const rooms = [];
+  const makeRoom = (c, kind) => {
+    const ctr = cc(c);
+    const rw = kind === 'boss' ? 11 : kind === 'start' ? 7 : kind === 'dead' ? [5, 7][randInt(0, 1)] : [7, 9, 11][randInt(0, 2)];
+    const rh = kind === 'boss' ? 9 : kind === 'start' ? 6 : kind === 'dead' ? [5, 6][randInt(0, 1)] : [6, 7, 8, 9][randInt(0, 3)];
+    const x0 = Math.floor(ctr.x - rw / 2), y0 = Math.floor(ctr.y - rh / 2);
+    const room = { kind, x0, y0, x1: x0 + rw - 1, y1: y0 + rh - 1, cx: ctr.x, cy: ctr.y };
+    carve(room.x0, room.y0, room.x1, room.y1);
+    rooms.push(room);
+    return room;
+  };
+  const corridor = (a, b) => {                              // 兩個大格中心之間挖一條 3 格寬的直走廊
+    const A = cc(a), B = cc(b);
+    carve(Math.floor(Math.min(A.x, B.x)) - 1, Math.floor(Math.min(A.y, B.y)) - 1, Math.floor(Math.max(A.x, B.x)) + 1, Math.floor(Math.max(A.y, B.y)) + 1);
+  };
+  const routeRooms = route.map((c, i) => makeRoom(c, i === 0 ? 'start' : i === route.length - 1 ? 'boss' : 'room'));
+  for (let i = 0; i < route.length - 1; i++) corridor(route[i], route[i + 1]);
+  branches.forEach((b) => { b.room = makeRoom(b, 'dead'); corridor(route[b.from], b); });
+
+  // ---------- 障礙物：柱子、水池／岩漿，只放在房間的四個角落（不擋住進出的路）----------
+  const free = (r, tx, ty) => tx > r.x0 && tx < r.x1 && ty > r.y0 && ty < r.y1 && Math.abs(tx - r.cx) >= 2 && Math.abs(ty - r.cy) >= 2 && grid[ty][tx] && !obst[ty][tx];
+  for (const r of rooms) {
+    if (r.kind === 'start') continue;
+    const spots = [];
+    for (let ty = r.y0; ty <= r.y1; ty++) for (let tx = r.x0; tx <= r.x1; tx++) if (free(r, tx, ty)) spots.push([tx, ty]);
+    shuffle(spots);
+    if (r.kind === 'boss') {                                // Boss 房：四根對稱的柱子
+      for (const [sx, sy] of [[-3, -2], [3, -2], [-3, 2], [3, 2]]) { const tx = r.cx + sx, ty = r.cy + sy; if (free(r, tx, ty)) { grid[ty][tx] = false; obst[ty][tx] = 1; } }
+      continue;
+    }
+    if (Math.random() < 0.55) {                             // 水池：2×2 的一塊
+      const s = spots.find(([x, y]) => free(r, x, y) && free(r, x + 1, y) && free(r, x, y + 1) && free(r, x + 1, y + 1));
+      if (s) for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { grid[s[1] + dy][s[0] + dx] = false; obst[s[1] + dy][s[0] + dx] = 2; }
+    }
+    let pillars = randInt(1, 4);
+    for (const [x, y] of spots) { if (pillars <= 0) break; if (free(r, x, y)) { grid[y][x] = false; obst[y][x] = 1; pillars--; } }
+  }
+
+  // ---------- 尖刺陷阱：放在房間之間的走廊中段 ----------
+  const traps = [];
+  for (let i = 0; i < route.length - 1; i++) {
+    if (Math.random() < 0.6) continue;
+    const A = cc(route[i]), B = cc(route[i + 1]);
+    const mx = Math.floor((A.x + B.x) / 2), my = Math.floor((A.y + B.y) / 2);
+    const horizontal = A.y === B.y;
+    for (let k = -1; k <= 1; k++) for (let d = 0; d < 2; d++) {
+      const tx = horizontal ? mx + d : mx + k, ty = horizontal ? my + k : my + d;
+      if (grid[ty][tx]) { trapGrid[ty][tx] = true; traps.push([tx, ty]); }
+    }
+  }
+
+  // ---------- 角色的前進路線：依序走過每個房間中心；遇到死路房就進去再回頭 ----------
+  const P = [];
+  const addPt = (tx, ty) => {
+    const px = tx * TILE + TILE / 2, py = ty * TILE + TILE / 2, last = P[P.length - 1];
+    P.push({ x: px, y: py, cum: last ? last.cum + Math.hypot(px - last.x, py - last.y) : 0 });
+    return P[P.length - 1];
+  };
+  const events = [], props = [];
+  route.forEach((c, i) => {
+    const ctr = cc(c), pt = addPt(ctr.x, ctr.y);
+    if (i > 0 && i < route.length - 1) events.push({ d: pt.cum, type: 'mob', room: routeRooms[i] });          // 房間裡的怪物
+    branches.filter((b) => b.from === i).forEach((b) => {
+      const bc = cc(b), bp = addPt(bc.x, bc.y);                                                            // 走進死路房
+      if (b.guard) events.push({ d: bp.cum - 40, type: 'mob', room: b.room, guard: true });
+      const ev = { d: bp.cum, type: b.prop, prop: true, hidden: b.prop === 'chest' && Math.random() < CONFIG.mimicChance };
+      events.push(ev);
+      props.push({ type: b.prop, x: bp.x, y: bp.y, ev });
+      addPt(ctr.x, ctr.y);                                                                                  // 再走回主路
+    });
+  });
+  const segs = [];
+  for (let i = 0; i < P.length - 1; i++) {
+    const a = P[i], b = P[i + 1], len = Math.hypot(b.x - a.x, b.y - a.y);
+    if (len < 1) continue;
+    segs.push({ x0: a.x, y0: a.y, x1: b.x, y1: b.y, len, cum: a.cum });
+  }
+  const totalL = P[P.length - 1].cum;
+  const bossRoom = routeRooms[routeRooms.length - 1];
+  events.push({ d: totalL, type: 'boss' });
+  events.sort((a, b) => a.d - b.d);
+  const firstMob = events.find((e) => e.type === 'mob');
+  if (firstMob) firstMob.first = true;                      // 第一場戰鬥只有 1 隻怪，當作暖身
+
+  // ---------- 牆上的火把 ----------
+  const torches = [];
+  for (const r of rooms) { if (r.kind === 'dead') continue; torches.push([r.cx - 3, r.y0 - 1], [r.cx + 3, r.y0 - 1]); }
+
+  return { grid, obst, trapGrid, seen, traps, props, rooms, WT, HT, worldW: WT * TILE, worldH: HT * TILE, segs, totalL, events, torches,
+           bossPos: { x: bossRoom.cx * TILE + TILE / 2, y: bossRoom.cy * TILE + TILE / 2 } };
+}
+
+// 路線上第 s 像素的位置（以及行進方向）
+function posAt(s) {
+  s = Math.max(0, Math.min(dun.totalL, s));
+  const segs = dun.segs;
+  for (let i = 0; i < segs.length; i++) {
+    const g = segs[i];
+    if (s <= g.cum + g.len || i === segs.length - 1) {
+      const t = (s - g.cum) / g.len;
+      return { x: g.x0 + (g.x1 - g.x0) * t, y: g.y0 + (g.y1 - g.y0) * t, ux: (g.x1 - g.x0) / g.len, uy: (g.y1 - g.y0) / g.len };
+    }
+  }
+}
+const isFloor = (px, py) => {
+  const tx = Math.floor(px / TILE), ty = Math.floor(py / TILE);
+  return ty >= 0 && ty < dun.HT && tx >= 0 && tx < dun.WT && dun.grid[ty][tx];
+};
+const floorAt = (tx, ty) => ty >= 0 && ty < dun.HT && tx >= 0 && tx < dun.WT && dun.grid[ty][tx];
+
+// 這個位置「站得下」嗎？檢查身體四個角（r = 身體半徑），避免半個身體嵌進牆裡
+function fits(x, y, r) {
+  return isFloor(x - r, y - r) && isFloor(x + r, y - r) && isFloor(x - r, y + r) && isFloor(x + r, y + r);
+}
+// 移動時避免走進牆壁：x 和 y 分開檢查，所以碰到牆會「貼著牆滑」，不會整個卡死
+function moveEntity(e, dx, dy) {
+  const r = e.bodyR || 8;
+  if (fits(e.x + dx, e.y, r)) e.x += dx;
+  if (fits(e.x, e.y + dy, r)) e.y += dy;
+}
+
+// ---------- 尋路：讓怪物知道怎麼繞過牆壁和柱子 ----------
+// 做法叫「流場」：從主角所在的格子開始，一圈一圈往外算出「每一格離主角有幾步」。
+// 怪物只要一直走向「步數更少」的鄰居格子，就會自動繞過轉角、找到最短的路。
+let flow = null, flowTx = -1, flowTy = -1;
+function updateFlow() {
+  const tx = Math.floor(hero.x / TILE), ty = Math.floor(hero.y / TILE);
+  if (flow && tx === flowTx && ty === flowTy) return;          // 主角還在同一格，不用重算
+  flowTx = tx; flowTy = ty;
+  flow = Array.from({ length: dun.HT }, () => new Array(dun.WT).fill(-1));
+  const queue = [[tx, ty]];
+  flow[ty][tx] = 0;
+  for (let i = 0; i < queue.length; i++) {
+    const [cx, cy] = queue[i];
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = cx + dx, ny = cy + dy;
+      if (floorAt(nx, ny) && flow[ny][nx] < 0) { flow[ny][nx] = flow[cy][cx] + 1; queue.push([nx, ny]); }
+    }
+  }
+}
+// 兩點之間沒有牆擋住嗎？（沿著連線每 6 像素檢查一次）
+function clearLine(a, b, r) {
+  const d = Math.hypot(b.x - a.x, b.y - a.y), n = Math.ceil(d / 6);
+  for (let i = 1; i < n; i++) {
+    const t = i / n;
+    if (!fits(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, r)) return false;
+  }
+  return true;
+}
+// 怪物該朝哪個方向走？看得到主角就直直走過去，看不到就沿著流場繞路
+function chaseDir(m) {
+  const r = m.bodyR;
+  if (clearLine(m, hero, r)) { const d = dist(m, hero) || 1; return { x: (hero.x - m.x) / d, y: (hero.y - m.y) / d }; }
+  const tx = Math.floor(m.x / TILE), ty = Math.floor(m.y / TILE);
+  let best = null, bd = (flow[ty] && flow[ty][tx] >= 0) ? flow[ty][tx] : Infinity;
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+    const nx = tx + dx, ny = ty + dy;
+    if (!floorAt(nx, ny) || flow[ny][nx] < 0) continue;
+    if (dx && dy && !(floorAt(tx + dx, ty) && floorAt(tx, ty + dy))) continue;     // 斜著走不能切過牆角
+    if (flow[ny][nx] < bd) { bd = flow[ny][nx]; best = [nx, ny]; }
+  }
+  if (!best) return { x: 0, y: 0 };
+  const cx = best[0] * TILE + TILE / 2, cy = best[1] * TILE + TILE / 2;
+  const d = Math.hypot(cx - m.x, cy - m.y) || 1;
+  return { x: (cx - m.x) / d, y: (cy - m.y) / d };
+}
+
+// =====================================================
+// 3-8. 遊戲狀態
+// =====================================================
+const KEY = 'dungeonWalkerSave2';
+let gold = 0;
+let equip = { weapon: null, armor: null, trinket: null };
+let bag = [];
+let tipsSeen = {};
+let tab = 'equip';
+let newInBag = 0;
+let stageNo = 1, bestStage = 1;
+
+let stats;
+let hero, monsters, shots, zones, rings, bolts, particles, texts, twinTimers, logs;
+let elapsed, kills, dropsGot, totalDmg, shake, state, timeScale = 1, cam = null;
+// state: 'run' 進行中、'pause' 暫停、'dead' 倒下、'clear' 通關
+
+// 開始（或重打）目前這一關
+function startRun() {
+  dun = buildDungeon();
+  const p0 = posAt(0);
+  hero = { x: p0.x, y: p0.y, s: 0, hp: 0, maxHp: 0, anim: 0, mode: 'walk', actT: 0, actEv: null, fireT: 0.3, novaT: 2, trapCycle: -1 };
+  monsters = []; shots = []; zones = []; rings = []; bolts = []; particles = []; texts = []; twinTimers = []; logs = [];
+  elapsed = 0; kills = 0; dropsGot = 0; totalDmg = 0; shake = 0; cam = null; flow = null;
+  recalcStats();
+  hero.hp = hero.maxHp;
+  state = 'run';
+  $('end').classList.remove('show');
+  addLog(`第 ${stageNo} 關：${theme.name}`, '#ffd84d');
+}
+
+function recalcStats() {
+  const s = { fireDmg: 0, fireSpeed: 0, fireSplit: 0, fireExplode: 0, novaRadius: 0, novaChain: 0, crit: 0, hp: 0, burn: false, twin: false };
+  for (const slot of SLOTS) {
+    const it = equip[slot];
+    if (!it) continue;
+    for (const a of it.affixes) s[a.key] += a.v;
+    if (it.legend) s[it.legend] = true;
+  }
+  stats = s;
+  if (hero) {
+    const old = hero.maxHp;
+    hero.maxHp = CONFIG.heroHp + s.hp;
+    if (hero.maxHp > old) hero.hp += hero.maxHp - old;
+    hero.hp = Math.min(hero.hp, hero.maxHp);
+  }
+}
+const fireDamage = () => CONFIG.fireDmg * (1 + stats.fireDmg / 100);
+const fireCooldown = () => CONFIG.fireInterval / (1 + stats.fireSpeed / 100);
+const fireCount = () => 1 + stats.fireSplit;
+const novaR = () => CONFIG.novaRadius * (1 + stats.novaRadius / 100);
+const critRate = () => CONFIG.critChance + stats.crit / 100;
+
+// =====================================================
+// 3-9. 存檔
+// =====================================================
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify({ gold, equip, bag, tipsSeen, uid, stageNo, bestStage })); } catch (e) {}
+}
+function load() {
+  try {
+    const d = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (!d) return;
+    gold = d.gold || 0; equip = d.equip || equip; bag = d.bag || []; tipsSeen = d.tipsSeen || {};
+    uid = d.uid || 1; stageNo = d.stageNo || 1; bestStage = d.bestStage || 1;
+  } catch (e) {}
+}
+
+// =====================================================
+// 3-10. 戰鬥邏輯：每一幀更新一次（dt = 距離上一幀幾秒）
+// =====================================================
+const ACT_TIME = { chest: 0.9, altar: 1.4, fountain: 1.1 };     // 各種互動要花幾秒
+
+function update(dt) {
+  elapsed += dt;
+  hero.anim += dt;
+
+  // ---------- 依路線位置，在前方生出怪物 ----------
+  for (const ev of dun.events) {
+    if (!ev.spawned && (ev.type === 'mob' || ev.type === 'boss') && hero.s >= ev.d - (ev.type === 'boss' ? 300 : 230)) spawnEvent(ev);
+  }
+
+  // ---------- 找最近的怪物 ----------
+  let nearest = null, nd = Infinity;
+  for (const m of monsters) {
+    if (m.hp <= 0) continue;
+    const d = dist(m, hero);
+    if (d < nd) { nd = d; nearest = m; }
+  }
+
+  // ---------- 主角行為：走路、戰鬥、互動（寶箱／祭壇／治療泉）----------
+  if (hero.mode === 'act') {
+    hero.actT -= dt;
+    const col = { chest: '#ffd84d', altar: '#c45aff', fountain: '#4dd2ff' }[hero.actEv.type];
+    if (Math.random() < 0.5) particles.push({ x: hero.x + rand(-12, 12), y: hero.y - rand(0, 18), vx: 0, vy: -rand(30, 70), color: col, life: 0.5 });
+    if (hero.actT <= 0) { finishAct(hero.actEv); hero.mode = 'walk'; }
+  } else if (nearest && nd < CONFIG.fightRange) {
+    hero.mode = 'fight';                                // 怪物夠近了：停下來單挑
+    hero.hp = Math.min(hero.maxHp, hero.hp + CONFIG.heroRegenFight * dt);
+  } else {
+    hero.mode = 'walk';
+    hero.hp = Math.min(hero.maxHp, hero.hp + CONFIG.heroRegenWalk * dt);
+    const act = dun.events.find((e) => e.prop && !e.done);
+    if (act && hero.s >= act.d - 30) {                  // 走到寶箱／祭壇／治療泉前面：停下來互動
+      hero.mode = 'act'; hero.actEv = act; hero.actT = ACT_TIME[act.type]; act.done = true; playTone(500, 0.08);
+    } else {
+      hero.s = Math.min(dun.totalL, hero.s + CONFIG.heroSpeed * dt);   // 沿著走廊中線往前走
+      const p = posAt(hero.s);
+      hero.x = p.x; hero.y = p.y;
+    }
+  }
+
+  // ---------- 尖刺陷阱：每 2.4 秒冒出一次，冒出來的瞬間踩在上面會受傷 ----------
+  const phase = elapsed % 2.4, cycle = Math.floor(elapsed / 2.4);
+  const htx = Math.floor(hero.x / TILE), hty = Math.floor(hero.y / TILE);
+  if (dun.trapGrid[hty] && dun.trapGrid[hty][htx] && phase > 1.8 && hero.trapCycle !== cycle) {
+    hero.trapCycle = cycle;
+    const dmg = CONFIG.trapDmg + stageNo * 2;
+    hero.hp -= dmg; shake = Math.max(shake, 0.15);
+    addText(hero.x, hero.y - 26, '-' + dmg, '#ff5470', 14);
+    addLog('踩到尖刺陷阱！', '#ff9a9a');
+    playTone(160, 0.12, 'sawtooth', 0.06);
+  }
+
+  // ---------- 怪物行動 ----------
+  updateFlow();                                                 // 主角換格子時，重新算一次「怎麼走過去」
+  for (const m of monsters) {
+    if (m.hp <= 0) continue;
+    m.anim += dt;
+    if (m.flash > 0) m.flash -= dt;
+    const d = dist(m, hero) || 1;
+    if (!m.awake && d < CONFIG.aggroRange) m.awake = true;     // 主角靠近才會醒來
+    if (!m.awake) continue;
+    if (d > m.reach) {
+      const dir = chaseDir(m);                                  // 會繞過牆壁的走法
+      // 和旁邊的怪物保持一點距離，不要全部疊在同一個位置
+      let sx = 0, sy = 0;
+      for (const o of monsters) {
+        if (o === m || o.hp <= 0) continue;
+        const od = Math.hypot(m.x - o.x, m.y - o.y);
+        if (od > 0 && od < 16) { sx += (m.x - o.x) / od; sy += (m.y - o.y) / od; }
+      }
+      const mvx = (dir.x + sx * 0.5) * m.speed * dt, mvy = (dir.y + sy * 0.5) * m.speed * dt;
+      const bx = m.x, by = m.y;
+      moveEntity(m, mvx, mvy);
+      // 保險：如果幾乎沒動（被牆角卡住），就往自己所在格子的中央挪一點，通常就能脫困
+      if (Math.hypot(m.x - bx, m.y - by) < Math.hypot(mvx, mvy) * 0.3) {
+        const cx = Math.floor(m.x / TILE) * TILE + TILE / 2, cy = Math.floor(m.y / TILE) * TILE + TILE / 2;
+        const cd = Math.hypot(cx - m.x, cy - m.y);
+        if (cd > 1) moveEntity(m, ((cx - m.x) / cd) * m.speed * dt, ((cy - m.y) / cd) * m.speed * dt);
+      }
+    } else {
+      m.atkCd -= dt;
+      if (m.atkCd <= 0) {                                       // 近身攻擊
+        m.atkCd = m.atkInt;
+        hero.hp -= m.dmg;
+        shake = Math.max(shake, m.isBoss ? 0.25 : 0.12);
+        addText(hero.x, hero.y - 26, '-' + m.dmg, '#ff5470', 14);
+        playTone(m.isBoss ? 90 : 130, 0.14, 'sawtooth', 0.06);
+      }
+    }
+    // Boss 血量剩一半時，召喚兩隻手下幫忙（只有一次）
+    if (m.isBoss && !m.summoned && m.hp < m.maxHp / 2) {
+      m.summoned = true;
+      for (let i = 0; i < 2; i++) { const s = makeMonster(pickKind(), m.x + (i ? 30 : -30), m.y + 24); s.awake = true; if (fits(s.x, s.y, s.bodyR)) monsters.push(s); }
+      addLog(`${m.name}召喚了手下！`, '#ff8c2e');
+      addText(m.x, m.y - 50, '召喚！', '#ff8c2e', 16);
+    }
+  }
+
+  // ---------- 技能一：火球（朝最近的怪發射）----------
+  hero.fireT -= dt;
+  if (hero.fireT <= 0 && nearest && nd <= CONFIG.fireRange) { castFire(nearest); hero.fireT = fireCooldown(); }
+
+  // ---------- 技能二：震擊 ----------
+  hero.novaT -= dt;
+  if (hero.novaT <= 0 && nearest && nd <= novaR() * 0.95) {
+    castNova();
+    hero.novaT = CONFIG.novaInterval;
+    if (stats.twin) twinTimers.push(0.4);
+  }
+  for (let i = twinTimers.length - 1; i >= 0; i--) {
+    twinTimers[i] -= dt;
+    if (twinTimers[i] <= 0) { castNova(); twinTimers.splice(i, 1); }
+  }
+
+  // ---------- 火球飛行與命中 ----------
+  for (const s of shots) {
+    s.x += s.vx * dt; s.y += s.vy * dt;
+    s.trail.push({ x: s.x, y: s.y, life: 0.18 });
+    for (const t of s.trail) t.life -= dt;
+    s.trail = s.trail.filter((t) => t.life > 0);
+    for (const m of monsters) {
+      if (!s.dead && m.hp > 0 && dist(s, m) < m.hitR) { s.dead = true; fireHit(m, s); }
+    }
+    s.life -= dt;
+    if (s.life <= 0) s.dead = true;
+  }
+  shots = shots.filter((s) => !s.dead);
+
+  // ---------- 燃燒的地面（傳奇「焚地」）----------
+  for (const z of zones) {
+    z.life -= dt; z.tick -= dt;
+    if (z.tick <= 0) {
+      z.tick = 0.4;
+      for (const m of monsters) if (m.hp > 0 && dist(m, z) < 24 + m.hitR / 2) damageMonster(m, Math.max(1, Math.round(fireDamage() * CONFIG.burnRate)), '#ff9a2e', false);
+    }
+  }
+  zones = zones.filter((z) => z.life > 0);
+
+  // ---------- 光圈：震擊邊擴散邊傷害，爆炸只是視覺 ----------
+  for (const r of rings) {
+    r.t += dt;
+    const p = Math.min(r.t / r.dur, 1);
+    r.r = r.max * (1 - Math.pow(1 - p, 2));
+    if (r.kind === 'nova') {
+      for (const m of monsters) {
+        if (m.hp > 0 && !r.hit.has(m) && dist(m, r) <= r.r + m.hitR / 2) {
+          r.hit.add(m);
+          let dmg = CONFIG.novaDmg;
+          const crit = Math.random() < critRate();
+          if (crit) dmg *= CONFIG.critMult;
+          damageMonster(m, Math.round(dmg), crit ? '#ffe14d' : '#9be8ff', crit);
+          if (Math.random() < stats.novaChain / 100) chainLightning(m, dmg);
+        }
+      }
+    }
+  }
+  rings = rings.filter((r) => r.t < r.dur);
+
+  // ---------- 特效更新 ----------
+  for (const p of particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.92; p.vy *= 0.92; p.life -= dt; }
+  particles = particles.filter((p) => p.life > 0);
+  for (const t of texts) { t.y -= 30 * dt; t.life -= dt; }
+  texts = texts.filter((t) => t.life > 0);
+  for (const b of bolts) b.life -= dt;
+  bolts = bolts.filter((b) => b.life > 0);
+  if (shake > 0) shake -= dt;
+
+  monsters = monsters.filter((m) => m.hp > 0);
+
+  // ---------- 勝負判定 ----------
+  const boss = dun.events[dun.events.length - 1];
+  if (boss.spawned && !monsters.some((m) => m.isBoss)) winStage();
+  else if (hero.hp <= 0) die();
+}
+
+// 這個主題會出現哪種怪物？（第 1 關還沒有骷髏兵）
+function pickKind() {
+  let kind = theme.kinds[pickWeighted(theme.kinds.map((k) => k[1]))][0];
+  if (kind === 'skel' && stageNo < 2) kind = 'slime';
+  return kind;
+}
+
+// 在路線前方放上怪物
+function spawnEvent(ev) {
+  ev.spawned = true;
+  if (ev.type === 'boss') {
+    const b = makeMonster('boss', dun.bossPos.x, dun.bossPos.y);
+    b.ev = ev;
+    monsters.push(b);
+    addLog(`Boss 出現了：${b.name}！`, '#ff5470');
+    return;
+  }
+  const r = ev.room;
+  const n = ev.first ? 1 : ev.guard ? 2 : randInt(1, Math.min(4, 1 + Math.floor((stageNo + 1) / 2)));
+  for (let i = 0; i < n; i++) {
+    const m = makeMonster(pickKind(), 0, 0);
+    // 在房間裡隨機找一個站得下的位置
+    for (let tries = 0; tries < 30; tries++) {
+      const x = rand(r.x0 + 1, r.x1) * TILE, y = rand(r.y0 + 1, r.y1) * TILE;
+      if (fits(x, y, m.bodyR) && Math.hypot(x - dun.segs[0].x0, y - dun.segs[0].y0) > 60) { m.x = x; m.y = y; break; }
+    }
+    if (!m.x) { m.x = r.cx * TILE + TILE / 2; m.y = r.cy * TILE + TILE / 2; }
+    m.ev = ev;                    // 記下這隻怪屬於哪次遇怪（進度條用）
+    monsters.push(m);
+  }
+}
+
+// 做出一隻怪物。每過一關，血量和傷害都會變強
+function makeMonster(kind, x, y) {
+  const hpMul = 1 + (stageNo - 1) * CONFIG.stageHpGrow, dmgMul = 1 + (stageNo - 1) * CONFIG.stageDmgGrow;
+  const def = {
+    slime: { hp: CONFIG.slimeHp, dmg: CONFIG.slimeDmg, spd: CONFIG.slimeSpeed, atk: CONFIG.slimeAtkInterval, reach: 20, hitR: 13, name: '史萊姆' },
+    skel:  { hp: CONFIG.skelHp,  dmg: CONFIG.skelDmg,  spd: CONFIG.skelSpeed,  atk: CONFIG.skelAtkInterval,  reach: 20, hitR: 13, name: '骷髏兵' },
+    ghost: { hp: CONFIG.ghostHp, dmg: CONFIG.ghostDmg, spd: CONFIG.ghostSpeed, atk: CONFIG.ghostAtkInterval, reach: 20, hitR: 13, name: '怨靈' },
+    mimic: { hp: CONFIG.mimicHp, dmg: CONFIG.mimicDmg, spd: CONFIG.mimicSpeed, atk: CONFIG.mimicAtkInterval, reach: 22, hitR: 14, name: '寶箱怪' },
+    boss:  { hp: CONFIG.bossHp,  dmg: CONFIG.bossDmg,  spd: CONFIG.bossSpeed,  atk: CONFIG.bossAtkInterval,  reach: 34, hitR: 26, name: theme.boss.name },
+  }[kind];
+  const hp = Math.round(def.hp * hpMul);
+  return {
+    kind, name: def.name, x, y, hp, maxHp: hp, dmg: Math.round(def.dmg * dmgMul), speed: def.spd * rand(0.9, 1.1),
+    atkInt: def.atk, atkCd: def.atk * 0.5, reach: def.reach, hitR: def.hitR, bodyR: kind === 'boss' ? 10 : 8,
+    isBoss: kind === 'boss', awake: false, flash: 0, anim: rand(0, 1),
+    color: theme.slime[randInt(0, theme.slime.length - 1)],
+  };
+}
+
+// 互動結束：依類型給獎勵
+function finishAct(ev) {
+  ev.opened = true;
+  const prop = dun.props.find((p) => p.ev === ev);
+  const px = prop.x, py = prop.y;
+  if (ev.type === 'chest') {
+    if (ev.hidden) {                                       // 寶箱怪！
+      const m = makeMonster('mimic', px, py);
+      m.awake = true;
+      monsters.push(m);
+      addLog('寶箱是寶箱怪！', '#ff5470');
+      addText(px, py - 30, '寶箱怪！', '#ff5470', 16);
+      shake = 0.3; playTone(100, 0.3, 'sawtooth', 0.07);
+      return;
+    }
+    const g = CONFIG.chestGold + stageNo * 5;
+    gold += g;
+    addLog(`打開寶箱！+${g} 金幣`, '#ffd84d');
+    addParticles(px, py, '#ffd84d', 16);
+    dropItem(px, py, 1, true);
+  } else if (ev.type === 'altar') {
+    const cost = Math.round(hero.maxHp * CONFIG.altarCost);
+    if (hero.hp <= cost + 5) { addLog('血量太低，祭壇沒有回應…', '#c9b8ff'); return; }
+    hero.hp -= cost;
+    addText(hero.x, hero.y - 26, '-' + cost, '#ff5470', 14);
+    addLog(`向祭壇獻上 ${cost} 點血量…`, '#c45aff');
+    addParticles(px, py, '#c45aff', 20);
+    if (Math.random() < CONFIG.altarWinChance) {
+      addLog('祭壇回應了你！', '#ff9aff');
+      [500, 700, 900, 1200].forEach((f, i) => playTone(f, 0.12, 'square', 0.05, i * 0.07));
+      dropItem(px, py, 2, true);
+    } else {
+      addLog('祭壇毫無反應……', '#9d93bf');
+      playTone(200, 0.3, 'sawtooth', 0.05);
+    }
+  } else if (ev.type === 'fountain') {
+    const heal = Math.round(hero.maxHp * CONFIG.fountainHeal);
+    hero.hp = Math.min(hero.maxHp, hero.hp + heal);
+    addText(hero.x, hero.y - 26, '+' + heal, '#7dff9d', 16);
+    addLog(`治療泉回復了 ${heal} 點血量`, '#7dff9d');
+    addParticles(px, py, '#4dd2ff', 18);
+    [600, 800, 1000].forEach((f, i) => playTone(f, 0.1, 'sine', 0.05, i * 0.07));
+  }
+}
+
+function castFire(target) {
+  const base = Math.atan2(target.y - hero.y, target.x - hero.x);
+  const n = fireCount();
+  for (let i = 0; i < n; i++) {
+    const a = base + (i - (n - 1) / 2) * 0.2;
+    shots.push({ x: hero.x + 10, y: hero.y - 12, vx: Math.cos(a) * CONFIG.fireSpeed, vy: Math.sin(a) * CONFIG.fireSpeed, trail: [], life: 1.2 });
+  }
+  playTone(700, 0.05, 'square', 0.012);
+}
+
+function fireHit(m, s) {
+  let dmg = fireDamage();
+  const crit = Math.random() < critRate();
+  if (crit) dmg *= CONFIG.critMult;
+  dmg = Math.round(dmg);
+  const sp = Math.hypot(s.vx, s.vy);
+  if (!m.isBoss) moveEntity(m, (s.vx / sp) * 4, (s.vy / sp) * 4);          // 小怪被打中會往後退一點
+  damageMonster(m, dmg, crit ? '#ffe14d' : '#fff', crit);
+  addLog(`你的火球對 ${m.name} 造成 ${dmg} 傷害${crit ? '（暴擊！）' : ''}`, crit ? '#ffe14d' : '#cfd6ff');
+  addParticles(m.x, m.y, '#ff9a2e', 4);
+  playTone(crit ? 520 : 300, 0.04, 'square', 0.025);
+  if (Math.random() < stats.fireExplode / 100) { explode(m.x, m.y, dmg, m); addLog('火球爆炸了！', '#ff9a2e'); }
+  if (stats.burn) zones.push({ x: m.x, y: m.y, life: CONFIG.burnDuration, tick: 0.1 });
+}
+
+function explode(x, y, baseDmg, except) {
+  rings.push({ kind: 'boom', x, y, r: 0, max: CONFIG.explodeRadius, t: 0, dur: 0.35 });
+  addParticles(x, y, '#ff9a2e', 14); addParticles(x, y, '#ffe14d', 8);
+  shake = Math.max(shake, 0.12);
+  playTone(110, 0.22, 'sawtooth', 0.06);
+  const dmg = Math.max(1, Math.round(baseDmg * CONFIG.explodeRate));
+  for (const m of monsters) {
+    if (m !== except && m.hp > 0 && Math.hypot(m.x - x, m.y - y) <= CONFIG.explodeRadius + m.hitR / 2) damageMonster(m, dmg, '#ff9a2e', false);
+  }
+}
+
+function castNova() {
+  rings.push({ kind: 'nova', x: hero.x, y: hero.y, r: 0, max: novaR(), t: 0, dur: 0.4, hit: new Set() });
+  playTone(180, 0.2, 'triangle', 0.06);
+}
+
+function chainLightning(start, baseDmg) {
+  const dmg = Math.max(1, Math.round(baseDmg * CONFIG.chainRate));
+  const hit = [start];
+  let from = { x: start.x, y: start.y };
+  for (let i = 0; i < CONFIG.chainJumps; i++) {
+    let next = null, best = CONFIG.chainRange;
+    for (const m of monsters) {
+      if (m.hp <= 0 || hit.includes(m)) continue;
+      const d = Math.hypot(m.x - from.x, m.y - from.y);
+      if (d < best) { best = d; next = m; }
+    }
+    if (!next) break;
+    bolts.push({ pts: boltPoints(from, next), life: 0.25 + i * 0.05 });
+    addParticles(next.x, next.y, '#9be8ff', 4);
+    hit.push(next);
+    from = { x: next.x, y: next.y };
+    damageMonster(next, dmg, '#9be8ff', false);
+  }
+  if (hit.length > 1) { playTone(1400, 0.06, 'sawtooth', 0.035); addLog('閃電連鎖！', '#9be8ff'); }
+}
+function boltPoints(a, b) {
+  const pts = [{ x: a.x, y: a.y }];
+  for (let i = 1; i < 6; i++) {
+    const t = i / 6;
+    pts.push({ x: a.x + (b.x - a.x) * t + rand(-8, 8), y: a.y + (b.y - a.y) * t + rand(-8, 8) });
+  }
+  pts.push({ x: b.x, y: b.y });
+  return pts;
+}
+
+// 對怪物造成傷害（所有技能都走這裡）
+function damageMonster(m, dmg, color, big) {
+  if (m.hp <= 0) return;
+  m.hp -= dmg;
+  totalDmg += dmg;
+  m.flash = 0.07;
+  addText(m.x + rand(-5, 5), m.y - m.hitR - 2, dmg + (big ? '!' : ''), color, big ? 16 : 11);
+  if (m.hp <= 0) killMonster(m);
+}
+
+function killMonster(m) {
+  kills++;
+  addParticles(m.x, m.y, m.isBoss ? '#ff4d9a' : m.color || '#ddd', m.isBoss ? 30 : 8);
+  const g = m.isBoss ? CONFIG.bossGold : m.kind === 'mimic' ? 40 + stageNo * 5 : randInt(2, 4) + stageNo;
+  gold += g;
+  addText(m.x, m.y, '+' + g, '#ffd84d', 11);
+  addLog(`擊敗了 ${m.name}！+${g} 金幣`, '#9dff9d');
+  if (m.isBoss) { shake = 0.5; [300, 400, 500, 700].forEach((f, i) => playTone(f, 0.15, 'square', 0.06, i * 0.08)); }
+  else if (m.kind === 'mimic') dropItem(m.x, m.y, 2, true);          // 打贏寶箱怪：保證至少稀有
+  else if (Math.random() < CONFIG.dropChance) dropItem(m.x, m.y, 0, false);
+}
+
+// 掉裝備：只給反饋（光柱、文字、音效、戰鬥記錄），不會打斷戰鬥，裝備自動進背包
+function dropItem(x, y, minRarity, bonus) {
+  const it = makeItem(Math.min((stageNo - 1) / 6 + (bonus ? 0.3 : 0), 1), minRarity);
+  giveItem(it, x, y);
+}
+function giveItem(it, x, y) {
+  if (bag.length >= CONFIG.bagMax) {
+    let idx = 0;
+    bag.forEach((b, i) => { if (b.rarity < bag[idx].rarity) idx = i; });
+    gold += SELL_PRICE[bag[idx].rarity];
+    bag.splice(idx, 1);
+  }
+  bag.push(it);
+  newInBag++; dropsGot++;
+  const col = RCOL[it.rarity];
+  addText(x, y - 24, '掉落！', col, 13);
+  addLog(`獲得 ${it.name}（${RARITY_NAME[it.rarity]}）`, col);
+  for (let i = 0; i < 6 + it.rarity * 5; i++) particles.push({ x: x + rand(-4, 4), y: y - rand(0, 10), vx: rand(-20, 20), vy: -rand(40, 110), color: col, life: rand(0.4, 0.9) });
+  [[600], [600, 800], [600, 800, 1000], [500, 700, 900, 1200]][it.rarity].forEach((f, i) => playTone(f, 0.1, 'square', 0.04, i * 0.07));
+  showTip('drop');
+  refreshUI();
+  save();
+}
+
+// 通關：Boss 掉兩件至少「稀有」的裝備
+function winStage() {
+  if (state !== 'run') return;
+  state = 'clear';
+  bestStage = Math.max(bestStage, stageNo);
+  giveItem(makeItem(0.8, 2), hero.x, hero.y);
+  giveItem(makeItem(0.8, 2), hero.x + 10, hero.y);
+  $('endTitle').innerHTML = '<span style="color:#ffd84d">通關！</span>';
+  $('endStats').innerHTML = `第 ${stageNo} 關（${theme.name}）完成<br>用時 ${Math.floor(elapsed)} 秒　擊殺 ${kills}　掉落 ${dropsGot}`;
+  $('endBtns').innerHTML = `<button class="px" data-end="next">下一關</button><button class="px sub" data-end="retry">再打一次</button>`;
+  $('end').classList.add('show');
+  save();
+}
+function die() {
+  if (state !== 'run') return;
+  state = 'dead';
+  $('endTitle').innerHTML = '<span style="color:#ff5470">倒下了…</span>';
+  $('endStats').innerHTML = `第 ${stageNo} 關失敗<br>前進 ${Math.round((hero.s / dun.totalL) * 100)}%　擊殺 ${kills}<br><span style="color:#9d93bf">裝備和金幣都保留，換件裝備再挑戰吧</span>`;
+  $('endBtns').innerHTML = `<button class="px" data-end="retry">再挑戰一次</button>`;
+  $('end').classList.add('show');
+  [400, 300, 200, 120].forEach((f, i) => playTone(f, 0.22, 'sawtooth', 0.05, i * 0.16));
+  save();
+}
+$('end').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-end]');
+  if (!b) return;
+  if (b.dataset.end === 'next') stageNo++;
+  startRun(); refreshUI(); save();
+});
+
+// ---------- 特效與記錄小工具 ----------
+function addText(x, y, text, color = '#fff', size = 12) {
+  texts.push({ x, y, text, color, size, life: 0.85 });
+  if (texts.length > 40) texts.shift();
+}
+function addParticles(x, y, color, n = 6) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), sp = rand(40, 160);
+    particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, color, life: rand(0.25, 0.5) });
+  }
+  if (particles.length > 260) particles.splice(0, particles.length - 260);
+}
+function addLog(text, color = '#cfd6ff') {
+  logs.push({ text, color });
+  if (logs.length > 4) logs.shift();
+}
+
+// =====================================================
+// 3-11. 畫面繪製
+// =====================================================
+function draw() {
+  // 鏡頭目標：平常看向走廊前方；戰鬥時偏向最近的怪物，讓你看得到對手
+  let fx = hero.x, fy = hero.y;
+  let near = null, nd = 260;
+  for (const m of monsters) { const d = dist(m, hero); if (d < nd) { nd = d; near = m; } }
+  if (near) { fx = (hero.x * 2 + near.x) / 3; fy = (hero.y * 2 + near.y) / 3; }
+  else { const a = posAt(hero.s + 140); fx = (hero.x + a.x) / 2; fy = (hero.y + a.y) / 2; }
+  if (!cam) cam = { x: fx, y: fy };
+  cam.x += (fx - cam.x) * 0.12; cam.y += (fy - cam.y) * 0.12;     // 慢慢滑過去，不要突然跳
+  const camX = Math.round(Math.max(0, Math.min(dun.worldW - W, cam.x - W / 2)));
+  const camY = Math.round(Math.max(0, Math.min(dun.worldH - H, cam.y - H / 2 + 10)));
+
+  ctx.save();
+  ctx.fillStyle = theme.void; ctx.fillRect(0, 0, W, H);
+  ctx.translate(-camX + (shake > 0 ? rand(-3, 3) : 0), -camY + (shake > 0 ? rand(-3, 3) : 0));
+
+  drawTiles(camX, camY);
+  for (const p of dun.props) drawProp(p);
+
+  // 燃燒的地面
+  for (const z of zones) {
+    ctx.globalAlpha = Math.min(1, z.life);
+    for (let i = 0; i < 6; i++) {
+      const fx2 = z.x + Math.sin(i * 2.1 + z.life * 9) * 14, fy2 = z.y + Math.cos(i * 1.7 + z.life * 7) * 9;
+      ctx.fillStyle = i % 2 ? '#ff7a2e' : '#ffd84d';
+      ctx.fillRect(Math.round(fx2) - 3, Math.round(fy2) - 3, 6, 6);
+    }
+  }
+  ctx.globalAlpha = 1;
+
+  // 怪物（Y 座標小的先畫，讓前後遮擋正確）
+  for (const m of [...monsters].sort((a, b) => a.y - b.y)) drawMonster(m);
+  drawHero();
+
+  // 光圈
+  for (const r of rings) {
+    const p = r.t / r.dur;
+    ctx.globalAlpha = 1 - p;
+    if (r.kind === 'nova') {
+      ctx.strokeStyle = '#9be8ff'; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.arc(r.x, r.y, Math.max(1, r.r), 0, TAU); ctx.stroke();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(r.x, r.y, Math.max(1, r.r), 0, TAU); ctx.stroke();
+    } else {
+      ctx.fillStyle = '#ff9a2e';
+      ctx.beginPath(); ctx.arc(r.x, r.y, r.r * (0.3 + 0.7 * p), 0, TAU); ctx.fill();
+      ctx.fillStyle = '#fff3a8';
+      ctx.beginPath(); ctx.arc(r.x, r.y, r.r * (0.3 + 0.7 * p) * 0.55, 0, TAU); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+
+  // 火球和拖尾
+  for (const s of shots) {
+    for (const t of s.trail) {
+      ctx.globalAlpha = Math.max(0, t.life / 0.18) * 0.7;
+      ctx.fillStyle = '#ff7a2e'; ctx.fillRect(Math.round(t.x) - 3, Math.round(t.y) - 3, 6, 6);
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#ffd84d'; ctx.fillRect(Math.round(s.x) - 4, Math.round(s.y) - 4, 8, 8);
+    ctx.fillStyle = '#fff'; ctx.fillRect(Math.round(s.x) - 2, Math.round(s.y) - 2, 4, 4);
+  }
+
+  // 閃電：先畫粗藍線再疊細白線，就會發光
+  for (const b of bolts) {
+    ctx.globalAlpha = Math.min(1, b.life * 5);
+    for (const pass of [{ w: 5, c: '#4db8ff' }, { w: 2, c: '#fff' }]) {
+      ctx.strokeStyle = pass.c; ctx.lineWidth = pass.w;
+      ctx.beginPath();
+      b.pts.forEach((pt, i) => (i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y)));
+      ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 1;
+
+  for (const p of particles) { ctx.fillStyle = p.color; ctx.fillRect(Math.round(p.x) - 2, Math.round(p.y) - 2, 4, 4); }
+
+  ctx.textAlign = 'center';
+  for (const t of texts) {
+    ctx.globalAlpha = Math.min(1, t.life * 2);
+    ctx.font = `bold ${t.size}px sans-serif`;
+    ctx.fillStyle = '#000'; ctx.fillText(t.text, t.x + 1, t.y + 1);
+    ctx.fillStyle = t.color; ctx.fillText(t.text, t.x, t.y);
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  drawHUD();
+}
+
+// 畫地板、磚牆、障礙物、陷阱和火把（只畫鏡頭看得到的格子）
+function drawTiles(camX, camY) {
+  const x0 = Math.floor(camX / TILE), x1 = Math.ceil((camX + W) / TILE);
+  const y0 = Math.floor(camY / TILE), y1 = Math.ceil((camY + H) / TILE);
+  const phase = elapsed % 2.4;
+  for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) {
+    if (ty < 0 || ty >= dun.HT || tx < 0 || tx >= dun.WT) continue;
+    const px = tx * TILE, py = ty * TILE;
+    const isF = dun.grid[ty][tx], ob = dun.obst[ty][tx];
+    if (isF || ob) {
+      const h = (tx * 7 + ty * 13) % 7;
+      ctx.fillStyle = (tx + ty) % 2 ? theme.floorA : theme.floorB;
+      ctx.fillRect(px, py, TILE, TILE);
+      if (h === 0) { ctx.fillStyle = theme.crack; ctx.fillRect(px + 5, py + 9, 9, 2); ctx.fillRect(px + 12, py + 11, 2, 6); }
+      if (h === 3) { ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.fillRect(px + 14, py + 5, 4, 4); }
+      if (dun.trapGrid[ty][tx]) drawSpikes(px, py, phase);
+      if (ob === 1) drawPillar(px, py);
+      if (ob === 2) drawPool(px, py, tx, ty);
+    } else {
+      // 緊貼著地板的牆畫成磚牆，其他地方是黑暗
+      let nearFloor = false;
+      for (let dy = -1; dy <= 1 && !nearFloor; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const nx = tx + dx, ny = ty + dy;
+        if (floorAt(nx, ny) || (ny >= 0 && ny < dun.HT && nx >= 0 && nx < dun.WT && dun.obst[ny][nx])) { nearFloor = true; break; }
+      }
+      if (!nearFloor) continue;
+      ctx.fillStyle = theme.wall; ctx.fillRect(px, py, TILE, TILE);
+      ctx.fillStyle = theme.wallLine;
+      ctx.fillRect(px, py + 11, TILE, 2); ctx.fillRect(px, py + TILE - 1, TILE, 1);
+      ctx.fillRect(px + 11, py, 2, 11); ctx.fillRect(px + 5, py + 13, 2, 10); ctx.fillRect(px + 17, py + 13, 2, 10);
+      ctx.fillStyle = theme.wallHi; ctx.fillRect(px, py, TILE, 2);
+    }
+  }
+  // 火把：火焰會閃爍
+  for (const [tx, ty] of dun.torches) {
+    const px = tx * TILE + 8, py = ty * TILE + 4;
+    if (px < camX - 30 || px > camX + W + 30 || py < camY - 30 || py > camY + H + 30) continue;
+    ctx.fillStyle = '#2b1a10'; ctx.fillRect(px + 2, py + 8, 4, 10);
+    const f = Math.floor(elapsed * 8 + tx) % 2;
+    ctx.fillStyle = theme.torch; ctx.fillRect(px, py + 2 - f, 8, 8 + f);
+    ctx.fillStyle = '#fff3c0'; ctx.fillRect(px + 2, py + 4 - f, 4, 5);
+    ctx.globalAlpha = 0.08; ctx.fillStyle = theme.ambient;
+    ctx.beginPath(); ctx.arc(px + 4, py + 10, 46, 0, TAU); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+// 尖刺陷阱：平常是小孔，快冒出來時閃一下警告，冒出來時是尖刺
+function drawSpikes(px, py, phase) {
+  const up = phase > 1.8, warn = phase > 1.4 && phase <= 1.8;
+  ctx.fillStyle = '#2a2222'; ctx.fillRect(px + 2, py + 2, TILE - 4, TILE - 4);
+  for (const [sx, sy] of [[5, 5], [15, 5], [5, 15], [15, 15]]) {
+    if (up) { ctx.fillStyle = '#e8e8f0'; ctx.fillRect(px + sx, py + sy - 3, 4, 8); ctx.fillStyle = '#fff'; ctx.fillRect(px + sx + 1, py + sy - 3, 2, 3); }
+    else { ctx.fillStyle = warn && Math.floor(elapsed * 12) % 2 ? '#ff5470' : '#555'; ctx.fillRect(px + sx, py + sy, 4, 3); }
+  }
+}
+// 柱子（依主題不同：石柱、墓碑、黑岩）
+function drawPillar(px, py) {
+  if (theme.id === 'graveyard') {
+    ctx.fillStyle = '#000'; ctx.fillRect(px + 4, py + 2, 16, 21);
+    ctx.fillStyle = '#8a8a9a'; ctx.fillRect(px + 5, py + 4, 14, 18); ctx.fillRect(px + 7, py + 2, 10, 3);
+    ctx.fillStyle = '#55556a'; ctx.fillRect(px + 11, py + 7, 2, 9); ctx.fillRect(px + 8, py + 10, 8, 2);
+  } else if (theme.id === 'lava') {
+    ctx.fillStyle = '#000'; ctx.fillRect(px + 2, py + 3, 20, 19);
+    ctx.fillStyle = '#3a2a2a'; ctx.fillRect(px + 3, py + 5, 18, 16);
+    ctx.fillStyle = '#5a3a3a'; ctx.fillRect(px + 3, py + 5, 18, 3);
+    ctx.fillStyle = Math.floor(elapsed * 3 + px) % 2 ? '#ff7a2e' : '#ff4d2e'; ctx.fillRect(px + 9, py + 12, 3, 3); ctx.fillRect(px + 15, py + 16, 2, 2);
+  } else {
+    ctx.fillStyle = '#000'; ctx.fillRect(px + 3, py + 1, 18, 22);
+    ctx.fillStyle = '#8a8a98'; ctx.fillRect(px + 4, py + 3, 16, 19);
+    ctx.fillStyle = '#a8a8b8'; ctx.fillRect(px + 4, py + 3, 16, 3);
+    ctx.fillStyle = '#66667a'; ctx.fillRect(px + 16, py + 6, 4, 16);
+  }
+}
+// 水池／毒池／岩漿（會閃爍）
+function drawPool(px, py, tx, ty) {
+  const f = Math.floor(elapsed * 2 + tx + ty) % 2;
+  if (theme.id === 'graveyard') { ctx.fillStyle = '#2f6a2f'; ctx.fillRect(px, py, TILE, TILE); ctx.fillStyle = f ? '#4a9a3a' : '#3d8a32'; ctx.fillRect(px + 3, py + 4, 8, 3); ctx.fillStyle = '#9dff7a'; ctx.fillRect(px + 14, py + 13 - f * 3, 3, 3); }
+  else if (theme.id === 'lava') { ctx.fillStyle = '#d4380f'; ctx.fillRect(px, py, TILE, TILE); ctx.fillStyle = f ? '#ff7a1a' : '#ff9a2e'; ctx.fillRect(px + 3, py + 5, 10, 4); ctx.fillStyle = '#ffe14d'; ctx.fillRect(px + 14, py + 14, 4, 3); }
+  else { ctx.fillStyle = '#244a86'; ctx.fillRect(px, py, TILE, TILE); ctx.fillStyle = f ? '#3a6ab8' : '#2f5aa0'; ctx.fillRect(px + 3, py + 5, 10, 3); ctx.fillStyle = '#8ab4ff'; ctx.fillRect(px + 14, py + 14, 5, 2); }
+}
+
+// 寶箱、祭壇、治療泉
+function drawProp(p) {
+  const x = Math.round(p.x), y = Math.round(p.y), open = p.ev.opened;
+  if (p.type === 'chest') {
+    ctx.fillStyle = '#000'; ctx.fillRect(x - 11, y - 9, 22, 18);
+    ctx.fillStyle = '#b8692e'; ctx.fillRect(x - 10, y - (open ? 12 : 8), 20, open ? 5 : 7);
+    ctx.fillStyle = '#8a4a1e'; ctx.fillRect(x - 10, y - 1, 20, 9);
+    ctx.fillStyle = '#ffe14d'; ctx.fillRect(x - 2, y - 3, 4, 5);
+    if (open && !p.ev.hidden) { ctx.fillStyle = '#fff3a8'; ctx.fillRect(x - 6, y - 8, 12, 3); }
+  } else if (p.type === 'altar') {
+    ctx.fillStyle = '#000'; ctx.fillRect(x - 13, y - 4, 26, 16);
+    ctx.fillStyle = '#6a5a8a'; ctx.fillRect(x - 12, y - 3, 24, 14); ctx.fillStyle = '#8a7aaa'; ctx.fillRect(x - 12, y - 3, 24, 3);
+    const f = Math.floor(elapsed * 4) % 2;
+    ctx.fillStyle = '#000'; ctx.fillRect(x - 5, y - 17 - f, 10, 14);
+    ctx.fillStyle = open ? '#6a4a8a' : '#c45aff'; ctx.fillRect(x - 4, y - 16 - f, 8, 12);
+    ctx.fillStyle = '#f0d0ff'; ctx.fillRect(x - 2, y - 14 - f, 3, 5);
+  } else {
+    ctx.fillStyle = '#000'; ctx.fillRect(x - 15, y - 9, 30, 20);
+    ctx.fillStyle = '#7a7a8a'; ctx.fillRect(x - 14, y - 8, 28, 18);
+    const f = Math.floor(elapsed * 3) % 2;
+    ctx.fillStyle = open ? '#3a5a7a' : '#4dd2ff'; ctx.fillRect(x - 11, y - 5, 22, 12);
+    ctx.fillStyle = '#c8f4ff'; ctx.fillRect(x - 7 + f * 6, y - 3, 5, 2);
+    if (!open) { ctx.fillStyle = '#c8f4ff'; ctx.fillRect(x - 1, y - 14 - f * 2, 3, 6); }
+  }
+}
+
+function drawMonster(m) {
+  const s = m.isBoss ? 6 : 3;
+  const bob = Math.sin(m.anim * 6) * (m.awake ? 1.5 : 0.5);
+  const c = { G: m.color, W: '#fff', K: '#000' };
+  if (m.isBoss) {
+    if (theme.boss.sprite === 'skel') drawSprite(ctx, SKEL_ROWS, m.x, m.y + bob, s, { W: theme.boss.color, K: '#222' }, m.flash > 0);
+    else drawSprite(ctx, SLIME_FRAMES[Math.floor(m.anim * 4) % 2], m.x, m.y + bob, s, { G: theme.boss.color, W: '#fff', K: '#000' }, m.flash > 0);
+  }
+  else if (m.kind === 'skel') drawSprite(ctx, SKEL_ROWS, m.x, m.y + bob, s, { W: '#e8e4d0', K: '#222' }, m.flash > 0);
+  else if (m.kind === 'ghost') { ctx.globalAlpha = 0.85; drawSprite(ctx, GHOST_ROWS, m.x, m.y + bob * 2, s, { G: '#c8e8ff', K: '#223' }, m.flash > 0); ctx.globalAlpha = 1; }
+  else if (m.kind === 'mimic') drawSprite(ctx, MIMIC_ROWS, m.x, m.y + bob, s, { O: '#b8692e', W: '#fff', K: '#000' }, m.flash > 0);
+  else drawSprite(ctx, SLIME_FRAMES[Math.floor(m.anim * 4) % 2], m.x, m.y + bob, s, c, m.flash > 0);
+  if (m.isBoss) {                                                        // Boss 戴一頂皇冠
+    ctx.fillStyle = '#000'; ctx.fillRect(Math.round(m.x) - 15, Math.round(m.y) - 34, 30, 12);
+    ctx.fillStyle = '#ffd84d'; ctx.fillRect(Math.round(m.x) - 13, Math.round(m.y) - 32, 26, 8);
+    ctx.fillRect(Math.round(m.x) - 13, Math.round(m.y) - 36, 6, 5); ctx.fillRect(Math.round(m.x) - 3, Math.round(m.y) - 38, 6, 7); ctx.fillRect(Math.round(m.x) + 7, Math.round(m.y) - 36, 6, 5);
+  }
+  if (!m.awake) { ctx.fillStyle = '#9d93bf'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('z', m.x + 12, m.y - 12 + Math.sin(m.anim * 3) * 2); }
+  if (m.hp < m.maxHp || m.isBoss) {
+    const w = m.isBoss ? 60 : 24, top = m.y - (m.isBoss ? 44 : 20);
+    ctx.fillStyle = '#000'; ctx.fillRect(m.x - w / 2 - 1, top - 1, w + 2, 5);
+    ctx.fillStyle = '#ff5470'; ctx.fillRect(m.x - w / 2, top, w * Math.max(0, m.hp / m.maxHp), 3);
+  }
+}
+
+// 主角：造型會跟著裝備變化！長袍＝身體顏色　法杖＝杖頭顏色　護符＝頭上漂浮的寶石
+function drawHero() {
+  const moving = hero.mode === 'walk';
+  const bob = Math.sin(hero.anim * (moving ? 12 : 4)) * (moving ? 1.5 : 1);
+  const x = hero.x, y = hero.y + bob;
+  const hasLegend = SLOTS.some((s) => equip[s] && equip[s].rarity === 3);
+  if (hasLegend && Math.random() < 0.3) particles.push({ x: x + rand(-14, 14), y: y + rand(-10, 14), vx: 0, vy: -rand(20, 50), color: '#ff8c2e', life: 0.5 });
+
+  const wc = equip.weapon ? RCOL[equip.weapon.rarity] : '#8a7a5a';
+  ctx.fillStyle = '#5a3d1e'; ctx.fillRect(Math.round(x + 14), Math.round(y - 10), 3, 24);
+  ctx.fillStyle = '#000'; ctx.fillRect(Math.round(x + 11), Math.round(y - 19), 9, 9);
+  ctx.fillStyle = wc; ctx.fillRect(Math.round(x + 12), Math.round(y - 18), 7, 7);
+
+  const bc = equip.armor ? ARMOR_COL[equip.armor.rarity] : '#6d6d85';
+  drawSprite(ctx, HERO_ROWS, x, y, 3, { K: '#000', Y: '#ffd9a0', W: '#222', B: bc }, false);
+
+  if (equip.trinket) {
+    const gy = Math.round(y - 22 + Math.sin(hero.anim * 4) * 2);
+    ctx.fillStyle = '#000'; ctx.fillRect(Math.round(x - 5), gy - 1, 10, 10);
+    ctx.fillStyle = RCOL[equip.trinket.rarity]; ctx.fillRect(Math.round(x - 4), gy, 8, 8);
+  }
+  if (hero.mode === 'act') {                                             // 互動的進度條
+    const total = ACT_TIME[hero.actEv.type];
+    ctx.fillStyle = '#000'; ctx.fillRect(x - 16, y - 34, 32, 6);
+    ctx.fillStyle = '#ffd84d'; ctx.fillRect(x - 15, y - 33, 30 * (1 - hero.actT / total), 4);
+  }
+}
+
+// 畫面上的資訊：關卡、進度條、血量、統計、小地圖、戰鬥記錄
+function drawHUD() {
+  ctx.fillStyle = 'rgba(10,6,20,0.7)'; ctx.fillRect(0, 0, W, 46);
+
+  ctx.textAlign = 'left'; ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif';
+  ctx.fillText(`STAGE ${stageNo}`, 8, 14);
+  ctx.fillStyle = '#9d93bf'; ctx.font = '10px sans-serif';
+  ctx.fillText(theme.name, 8, 24);
+
+  // 進度條：小圖示 = 遇怪（紅）、寶箱（橘）、祭壇（紫）、治療泉（藍）、Boss（大紫）
+  const bx = 84, bw = W - bx - 12, by = 12;
+  ctx.fillStyle = '#000'; ctx.fillRect(bx - 2, by - 2, bw + 4, 8);
+  ctx.fillStyle = '#3a2f55'; ctx.fillRect(bx, by, bw, 4);
+  ctx.fillStyle = '#ffd84d'; ctx.fillRect(bx, by, bw * (hero.s / dun.totalL), 4);
+  for (const ev of dun.events) {
+    const ex = bx + bw * (ev.d / dun.totalL);
+    const done = ev.prop ? ev.opened : (ev.spawned && !monsters.some((m) => m.ev === ev) && hero.s > ev.d + 60);
+    const sz = ev.type === 'boss' ? 10 : 7;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(Math.round(ex - sz / 2) - 1, by + 2 - sz / 2 - 1 - 6, sz + 2, sz + 2);
+    ctx.fillStyle = done ? '#556' : ({ chest: '#ff9a2e', altar: '#c45aff', fountain: '#4dd2ff', boss: '#d44bd4', mob: '#ff5470' })[ev.type];
+    ctx.fillRect(Math.round(ex - sz / 2), by + 2 - sz / 2 - 6, sz, sz);
+  }
+  ctx.fillStyle = '#fff'; ctx.fillRect(Math.round(bx + bw * (hero.s / dun.totalL)) - 2, by - 3, 4, 10);   // 主角位置
+
+  // 血條
+  const w = 150;
+  ctx.fillStyle = '#000'; ctx.fillRect(7, 28, w + 4, 15);
+  ctx.fillStyle = '#3a2f55'; ctx.fillRect(9, 30, w, 11);
+  ctx.fillStyle = '#ff5470'; ctx.fillRect(9, 30, w * Math.max(0, hero.hp / hero.maxHp), 11);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(`HP ${Math.max(0, Math.ceil(hero.hp))}/${hero.maxHp}`, 9 + w / 2, 39);
+  ctx.textAlign = 'right'; ctx.fillStyle = '#ffd84d'; ctx.font = 'bold 13px sans-serif';
+  ctx.fillText(`💰 ${gold}`, W - 8, 40);
+
+  // 左側統計
+  ctx.textAlign = 'left'; ctx.font = 'bold 10px sans-serif';
+  const rows = [['擊殺', kills, '#ff9a9a'], ['掉落', dropsGot, '#9dc4ff'], ['傷害', totalDmg, '#ffd9a0']];
+  rows.forEach(([k, v, c], i) => {
+    ctx.fillStyle = 'rgba(10,6,20,0.6)'; ctx.fillRect(4, 52 + i * 14, 74, 13);
+    ctx.fillStyle = c; ctx.fillText(k, 8, 62 + i * 14);
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'right'; ctx.fillText(String(v), 74, 62 + i * 14); ctx.textAlign = 'left';
+  });
+
+  drawMiniMap();
+
+  // 戰鬥記錄（最新 4 行）
+  ctx.fillStyle = 'rgba(10,6,20,0.65)'; ctx.fillRect(0, H - 56, W, 56);
+  ctx.textAlign = 'left'; ctx.font = '11px sans-serif';
+  logs.forEach((l, i) => {
+    ctx.globalAlpha = 0.5 + 0.5 * (i + 1) / logs.length;
+    ctx.fillStyle = l.color; ctx.fillText(l.text, 8, H - 42 + i * 13);
+  });
+  ctx.globalAlpha = 1;
+
+  if (state === 'pause') {
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 28px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('暫停中', W / 2, H / 2);
+  }
+}
+
+// 小地圖：整張地城縮小，只顯示走過的地方
+function drawMiniMap() {
+  const sc = 1.1, mw = dun.WT * sc, mh = dun.HT * sc, ox = W - mw - 6, oy = 128;
+  ctx.fillStyle = 'rgba(10,6,20,0.3)'; ctx.fillRect(ox - 2, oy - 2, mw + 4, mh + 4);
+  for (let ty = 0; ty < dun.HT; ty++) for (let tx = 0; tx < dun.WT; tx++) {
+    if (!dun.seen[ty][tx] || (!dun.grid[ty][tx] && !dun.obst[ty][tx])) continue;
+    ctx.fillStyle = dun.obst[ty][tx] ? 'rgba(90,90,130,0.7)' : 'rgba(170,155,200,0.75)';
+    ctx.fillRect(ox + tx * sc, oy + ty * sc, sc, sc);
+  }
+  ctx.fillStyle = '#ffd84d'; ctx.fillRect(ox + (hero.x / TILE) * sc - 1.5, oy + (hero.y / TILE) * sc - 1.5, 3, 3);
+}
+// 主角附近的格子標記成「已探索」
+function markSeen() {
+  const tx = Math.floor(hero.x / TILE), ty = Math.floor(hero.y / TILE);
+  for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) {
+    const nx = tx + dx, ny = ty + dy;
+    if (ny >= 0 && ny < dun.HT && nx >= 0 && nx < dun.WT) dun.seen[ny][nx] = true;
+  }
+}
+
+// =====================================================
+// 3-12. 整備面板（下半部的介面）
+// =====================================================
+const fmtAffix = (a) => AFFIXES[a.key].text(a.v);
+const rerollCost = (it) => CONFIG.rerollBaseCost * (it.rerolls + 1);
+
+function itemCard(it, mode) {
+  const col = RCOL[it.rarity];
+  let h = `<div class="card" style="border-color:${col}">
+    <div class="head"><span class="chip" style="background:${col}"></span><b style="color:${col}">${it.name}</b>
+    <span class="slot">${RARITY_NAME[it.rarity]}・${SLOT_NAME[it.slot]}</span></div>`;
+  it.affixes.forEach((a, i) => {
+    h += `<div class="aff"><span class="t">${fmtAffix(a)}${a.perfect ? ' <span class="star">★完美</span>' : ''}</span>`;
+    if (mode === 'equipped') h += `<button class="px small sub" data-act="reroll" data-slot="${it.slot}" data-i="${i}" ${gold < rerollCost(it) ? 'disabled' : ''}>🎲 ${rerollCost(it)}</button>`;
+    h += `</div>`;
+  });
+  if (it.legend) h += `<div class="leg">✦ ${LEGENDS[it.legend].text}</div>`;
+  if (mode === 'bag') {
+    const cur = equip[it.slot];
+    h += `<div class="empty" style="font-size:12px">${cur ? '會換下：' + cur.name : '這個欄位目前是空的'}</div>
+      <div class="btns"><button class="px" data-act="equip" data-id="${it.id}">裝備</button>
+      <button class="px sub" data-act="sell" data-id="${it.id}">出售 💰${SELL_PRICE[it.rarity]}</button></div>`;
+  }
+  return h + `</div>`;
+}
+
+function refreshUI() {
+  $('summary').innerHTML =
+    `🔥 火球 傷害 ${fireDamage().toFixed(1)}　${fireCount()} 顆　每 ${fireCooldown().toFixed(2)} 秒<br>` +
+    `💥 震擊 範圍 ${Math.round(novaR())}　暴擊 ${Math.round(critRate() * 100)}%　血量 ${CONFIG.heroHp + stats.hp}`;
+  document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
+  $('badge').textContent = newInBag > 0 ? `(${bag.length}) 新!` : `(${bag.length})`;
+
+  let h = '';
+  if (tab === 'equip') {
+    for (const slot of SLOTS) {
+      const it = equip[slot];
+      h += it ? itemCard(it, 'equipped') : `<div class="card"><div class="head"><b>${SLOT_NAME[slot]}</b></div><div class="empty">（空）去背包裝一件吧</div></div>`;
+    }
+  } else if (!bag.length) {
+    h += `<div class="empty" style="padding:20px;text-align:center">背包是空的，怪物和寶箱會掉裝備！</div>`;
+  } else {
+    h += `<div class="btns" style="margin:0 0 8px"><button class="px sub" data-act="sellWhite">一鍵出售所有「普通」</button></div>`;
+    [...bag].sort((a, b) => b.rarity - a.rarity || b.id - a.id).forEach((it) => (h += itemCard(it, 'bag')));
+  }
+  const scroll = $('list').scrollTop;
+  $('list').innerHTML = h;
+  $('list').scrollTop = scroll;
+}
+
+const TIPS = {
+  start: '角色會沿著地城自己走、遇到怪就單挑，你只要看！走到盡頭有 Boss。',
+  drop: '掉寶了！點下面的「背包」看看。戰鬥不會停。',
+  equipped: '點詞綴旁邊的 🎲 可以重鑄，賭一把！',
+  reroll: '重鑄會把那一條詞綴換成別的，可能更好，也可能更差。',
+};
+let tipTimer = null;
+function showTip(k) {
+  if (tipsSeen[k]) return;
+  tipsSeen[k] = true;
+  const el = $('tip');
+  el.textContent = '💡 ' + TIPS[k];
+  el.classList.add('show');
+  clearTimeout(tipTimer);
+  tipTimer = setTimeout(() => el.classList.remove('show'), 9000);
+}
+let toastTimer = null;
+function toast(html, color = '#fff') {
+  const t = $('toast');
+  t.innerHTML = html; t.style.borderColor = color;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+$('panel').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-act]');
+  if (!btn) return;
+  const act = btn.dataset.act;
+  const id = Number(btn.dataset.id);
+  if (act === 'tab') { tab = btn.dataset.tab; if (tab === 'bag') newInBag = 0; }
+  if (act === 'equip') {
+    const i = bag.findIndex((b) => b.id === id);
+    if (i < 0) return;
+    const it = bag.splice(i, 1)[0];
+    if (equip[it.slot]) bag.push(equip[it.slot]);
+    equip[it.slot] = it;
+    recalcStats();
+    addText(hero.x, hero.y - 34, '換裝！', RCOL[it.rarity], 14);
+    addParticles(hero.x, hero.y, RCOL[it.rarity], 12);
+    addLog(`裝備了 ${it.name}`, RCOL[it.rarity]);
+    playTone(660, 0.08, 'square', 0.04); playTone(880, 0.1, 'square', 0.04, 0.07);
+    tab = 'equip';
+    showTip('equipped');
+    save();
+  }
+  if (act === 'sell') {
+    const i = bag.findIndex((b) => b.id === id);
+    if (i < 0) return;
+    gold += SELL_PRICE[bag[i].rarity]; bag.splice(i, 1);
+    playTone(900, 0.05, 'square', 0.03); save();
+  }
+  if (act === 'sellWhite') {
+    const keep = bag.filter((b) => b.rarity > 0);
+    gold += (bag.length - keep.length) * SELL_PRICE[0]; bag = keep;
+    playTone(900, 0.05, 'square', 0.03); save();
+  }
+  if (act === 'reroll') rerollAffix(equip[btn.dataset.slot], Number(btn.dataset.i));
+  refreshUI();
+});
+
+// 🎲 重鑄：把一條詞綴換成「另一種」詞綴，數值也重新骰。這就是賭裝備的核心！
+function rerollAffix(it, i) {
+  if (!it) return;
+  const cost = rerollCost(it);
+  if (gold < cost) { toast('金幣不夠！', '#ff5470'); return; }
+  gold -= cost;
+  it.rerolls++;
+  const old = it.affixes[i];
+  const key = pickAffixKeys(1, it.affixes.map((a) => a.key))[0];
+  const fresh = rollAffix(key);
+  it.affixes[i] = fresh;
+  recalcStats();
+  toast(`🎲 ${fmtAffix(old)}<br>→ ${fmtAffix(fresh)}${fresh.perfect ? ' ★完美' : ''}`, fresh.perfect ? '#ffd84d' : '#fff');
+  addText(hero.x, hero.y - 34, fresh.perfect ? '🎲 完美！' : '🎲 重鑄', fresh.perfect ? '#ffd84d' : '#fff', 14);
+  addParticles(hero.x, hero.y, fresh.perfect ? '#ffd84d' : '#c48bff', fresh.perfect ? 22 : 10);
+  addLog(`重鑄：${fmtAffix(fresh)}${fresh.perfect ? ' ★完美' : ''}`, fresh.perfect ? '#ffd84d' : '#c9b8ff');
+  fresh.perfect
+    ? [784, 988, 1175, 1568].forEach((f, k) => playTone(f, 0.12, 'square', 0.05, k * 0.07))
+    : (playTone(500, 0.06, 'square', 0.04), playTone(420, 0.08, 'square', 0.04, 0.06));
+  showTip('reroll');
+  save();
+}
+
+// 暫停和加速
+$('pauseBtn').addEventListener('click', () => {
+  if (state === 'run') { state = 'pause'; $('pauseBtn').textContent = '▶'; }
+  else if (state === 'pause') { state = 'run'; $('pauseBtn').textContent = '⏸'; last = performance.now(); }
+});
+$('speedBtn').addEventListener('click', () => {
+  timeScale = timeScale === 1 ? 2 : 1;
+  $('speedBtn').textContent = 'x' + timeScale;
+});
+
+let resetArmed = false;
+$('resetBtn').addEventListener('click', () => {
+  const b = $('resetBtn');
+  if (!resetArmed) { resetArmed = true; b.textContent = '再按一次確認清除'; setTimeout(() => { resetArmed = false; b.textContent = '清除存檔'; }, 3000); return; }
+  try { localStorage.removeItem(KEY); } catch (e) {}
+  gold = 0; equip = { weapon: null, armor: null, trinket: null }; bag = []; tipsSeen = {}; newInBag = 0; uid = 1; stageNo = 1; bestStage = 1;
+  giveStarter(); startRun(); refreshUI(); showTip('start');
+  resetArmed = false; b.textContent = '清除存檔';
+});
+function giveStarter() {
+  equip.weapon = { id: uid++, slot: 'weapon', rarity: 0, name: '見習法杖', affixes: [rollAffix('fireDmg')], legend: null, rerolls: 0 };
+}
+
+// =====================================================
+// 3-13. 主迴圈：瀏覽器每一幀都會呼叫，不斷「更新 → 畫圖」
+// =====================================================
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min((now - last) / 1000, 0.05) * timeScale;   // 切換分頁再回來時，不會一次跳太多
+  last = now;
+  if (state === 'run') { update(dt); markSeen(); }
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ---------- 啟動 ----------
+load();
+if (!equip.weapon && !equip.armor && !equip.trinket && !bag.length) giveStarter();
+startRun();
+refreshUI();
+showTip('start');
+setInterval(save, 10000);
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
